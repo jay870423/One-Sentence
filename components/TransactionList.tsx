@@ -82,19 +82,21 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onDelet
             <div className="space-y-2">
               {items.map((t) => (
                 <div key={t.id} className="group flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 ${
                       t.type === TransactionType.EXPENSE ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-600'
                     }`}>
                       {t.category.charAt(0)}
                     </div>
-                    <div className="overflow-hidden">
-                      <p className="font-semibold text-gray-900 truncate">{t.note}</p>
-                      <p className="text-xs text-gray-400">{t.category}</p>
+                    <div className="flex-1 min-w-0 py-1">
+                      <p className="font-semibold text-gray-900 break-words whitespace-pre-wrap leading-snug">
+                        {t.note}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">{t.category}</p>
                     </div>
                   </div>
                   
-                  <div className="text-right flex items-center gap-3 pl-2">
+                  <div className="text-right flex items-center gap-3 pl-3 flex-shrink-0">
                      <span className={`font-bold tabular-nums whitespace-nowrap ${
                       t.type === TransactionType.EXPENSE ? 'text-gray-900' : 'text-green-600'
                     }`}>

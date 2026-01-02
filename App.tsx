@@ -66,7 +66,9 @@ const App: React.FC = () => {
         alert(`[${selectedProvider}] 无法识别该内容，请尝试描述得更具体一些。`);
       }
     } catch (error: any) {
-      console.error("Parsing failed:", error);
+      // Log as warning instead of error for known configuration issues to keep console clean
+      console.warn(`[${selectedProvider}] Parsing failed:`, error.message);
+      
       // Show friendly error message from the service
       const providerName = selectedProvider === 'deepseek' ? 'DeepSeek' : 'Gemini';
       alert(`[${providerName}] 错误: ${error.message || '未知错误，请稍后重试'}`);

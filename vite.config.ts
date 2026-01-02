@@ -11,8 +11,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     define: {
       // This maps the process.env.API_KEY used in the code to the actual environment variable value at build time
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
-      'process.env.DEEPSEEK_API_KEY': JSON.stringify(env.DEEPSEEK_API_KEY),
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || ''),
+      'process.env.DEEPSEEK_API_KEY': JSON.stringify(env.DEEPSEEK_API_KEY || ''),
     },
     build: {
       outDir: 'dist',
