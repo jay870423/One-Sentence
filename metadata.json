@@ -1,5 +1,7 @@
 {
   "name": "One-Sentence Bookkeeping",
   "description": "A minimalist bookkeeping app powered by Gemini. Input natural language to track expenses instantly.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }
