@@ -3,6 +3,8 @@ export enum TransactionType {
   INCOME = 'INCOME',
 }
 
+export type AIProvider = 'gemini' | 'deepseek';
+
 export interface Transaction {
   id: string;
   amount: number;

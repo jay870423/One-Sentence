@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { parseInputWithGemini } from './services/geminiService';
+import { parseInput } from './services/geminiService';
 import { loadTransactions, saveTransactions } from './services/storageService';
-import { Transaction, ParseResult } from './types';
+import { Transaction, ParseResult, AIProvider } from './types';
 import InputSection from './components/InputSection';
 import ConfirmationModal from './components/ConfirmationModal';
 import TransactionList from './components/TransactionList';
@@ -12,6 +12,7 @@ const App: React.FC = () => {
   // Initialize state lazily from storage to prevent overwriting with empty array on first render
   const [transactions, setTransactions] = useState<Transaction[]>(() => loadTransactions());
   const [isParsing, setIsParsing] = useState(false);
+  const [provider, setProvider] = useState<AIProvider>('gemini');
   
   const [modalOpen, setModalOpen] = useState(false);
   const [currentParseResult, setCurrentParseResult] = useState<ParseResult | null>(null);
@@ -52,16 +53,25 @@ const App: React.FC = () => {
     });
   }, [monthTransactions, selectedDate]);
 
-  const handleParse = async (input: string) => {
+  const handleParse = async (input: string, selectedProvider: AIProvider) => {
     setIsParsing(true);
-    const result = await parseInputWithGemini(input);
-    setIsParsing(false);
-
-    if (result) {
-      setCurrentParseResult(result);
-      setModalOpen(true);
-    } else {
-      alert("Couldn't understand that. Please try again.");
+    try {
+      const result = await parseInput(input, selectedProvider);
+      
+      if (result) {
+        setCurrentParseResult(result);
+        setModalOpen(true);
+      } else {
+        // Returned null but no error thrown (unlikely with current service logic, but safe fallback)
+        alert(`[${selectedProvider}] 无法识别该内容，请尝试描述得更具体一些。`);
+      }
+    } catch (error: any) {
+      console.error("Parsing failed:", error);
+      // Show friendly error message from the service
+      const providerName = selectedProvider === 'deepseek' ? 'DeepSeek' : 'Gemini';
+      alert(`[${providerName}] 错误: ${error.message || '未知错误，请稍后重试'}`);
+    } finally {
+      setIsParsing(false);
     }
   };
 
@@ -124,7 +134,12 @@ const App: React.FC = () => {
                 
                 {/* Desktop Card Wrapper: Visual grouping for desktop */}
                 <div className="md:bg-gray-50 md:p-8 md:rounded-3xl md:border md:border-gray-100 space-y-8">
-                    <InputSection onParse={handleParse} isLoading={isParsing} />
+                    <InputSection 
+                        onParse={handleParse} 
+                        isLoading={isParsing} 
+                        provider={provider}
+                        setProvider={setProvider}
+                    />
                     <Calendar 
                         currentDate={viewDate} 
                         onPrevMonth={handlePrevMonth} 
