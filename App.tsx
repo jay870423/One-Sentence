@@ -15,7 +15,8 @@ const App: React.FC = () => {
   const [provider, setProvider] = useState<AIProvider>('gemini');
   
   const [modalOpen, setModalOpen] = useState(false);
-  const [currentParseResult, setCurrentParseResult] = useState<ParseResult | null>(null);
+  // Change: Store an array of results instead of a single object
+  const [currentParseResults, setCurrentParseResults] = useState<ParseResult[] | null>(null);
 
   // State for the currently viewed month
   const [viewDate, setViewDate] = useState(new Date());
@@ -56,20 +57,16 @@ const App: React.FC = () => {
   const handleParse = async (input: string, selectedProvider: AIProvider) => {
     setIsParsing(true);
     try {
-      const result = await parseInput(input, selectedProvider);
+      const results = await parseInput(input, selectedProvider);
       
-      if (result) {
-        setCurrentParseResult(result);
+      if (results && results.length > 0) {
+        setCurrentParseResults(results);
         setModalOpen(true);
       } else {
-        // Returned null but no error thrown (unlikely with current service logic, but safe fallback)
         alert(`[${selectedProvider}] 无法识别该内容，请尝试描述得更具体一些。`);
       }
     } catch (error: any) {
-      // Log as warning instead of error for known configuration issues to keep console clean
       console.warn(`[${selectedProvider}] Parsing failed:`, error.message);
-      
-      // Show friendly error message from the service
       const providerName = selectedProvider === 'deepseek' ? 'DeepSeek' : 'Gemini';
       alert(`[${providerName}] 错误: ${error.message || '未知错误，请稍后重试'}`);
     } finally {
@@ -77,22 +74,24 @@ const App: React.FC = () => {
     }
   };
 
-  const handleConfirmTransaction = (data: ParseResult) => {
-    const newTransaction: Transaction = {
+  const handleConfirmTransactions = (dataList: ParseResult[]) => {
+    const newTransactions: Transaction[] = dataList.map(data => ({
       id: uuidv4(),
       ...data,
       createdAt: Date.now(),
-    };
+    }));
     
-    setTransactions(prev => [newTransaction, ...prev]);
+    setTransactions(prev => [...newTransactions, ...prev]);
     setModalOpen(false);
-    setCurrentParseResult(null);
-
-    setSelectedDate(null); // Clear specific day selection to ensure they see the new entry in the month list
+    setCurrentParseResults(null);
+    setSelectedDate(null);
     
-    const transDate = new Date(data.date);
-    if (transDate.getMonth() !== viewDate.getMonth() || transDate.getFullYear() !== viewDate.getFullYear()) {
-       setViewDate(transDate); // Jump to the month of the new transaction
+    // Jump to the date of the first transaction in the batch
+    if (newTransactions.length > 0) {
+        const transDate = new Date(newTransactions[0].date);
+        if (transDate.getMonth() !== viewDate.getMonth() || transDate.getFullYear() !== viewDate.getFullYear()) {
+           setViewDate(transDate);
+        }
     }
   };
 
@@ -108,7 +107,7 @@ const App: React.FC = () => {
       newDate.setMonth(prev.getMonth() - 1);
       return newDate;
     });
-    setSelectedDate(null); // Clear day selection when changing month
+    setSelectedDate(null);
   };
 
   const handleNextMonth = () => {
@@ -130,11 +129,8 @@ const App: React.FC = () => {
       <main className="max-w-md md:max-w-6xl mx-auto md:px-6 transition-all duration-300">
         <div className="md:grid md:grid-cols-12 md:gap-12 items-start">
             
-            {/* Left Column: Input & Calendar & Footer(Desktop) 
-                Sticky on Desktop so it stays visible while scrolling transactions */}
+            {/* Left Column */}
             <div className="md:col-span-5 lg:col-span-4 md:sticky md:top-8 space-y-6 md:space-y-8">
-                
-                {/* Desktop Card Wrapper: Visual grouping for desktop */}
                 <div className="md:bg-gray-50 md:p-8 md:rounded-3xl md:border md:border-gray-100 space-y-8">
                     <InputSection 
                         onParse={handleParse} 
@@ -151,33 +147,29 @@ const App: React.FC = () => {
                         transactions={monthTransactions}
                     />
                 </div>
-
-                 {/* Desktop Footer */}
                 <div className="hidden md:block text-xs text-center text-gray-400 leading-relaxed">
                     <p>原创微信号：yajie870423</p>
                     <p>谷歌账户：695274107@qq.com</p>
                 </div>
             </div>
 
-            {/* Right Column: Transactions */}
+            {/* Right Column */}
             <div className="md:col-span-7 lg:col-span-8 mt-4 md:mt-0">
                  <TransactionList 
                     transactions={listTransactions} 
                     onDelete={handleDelete} 
                 />
             </div>
-
         </div>
       </main>
 
       <ConfirmationModal 
         isOpen={modalOpen} 
-        initialData={currentParseResult} 
-        onConfirm={handleConfirmTransaction} 
+        initialData={currentParseResults} 
+        onConfirm={handleConfirmTransactions} 
         onCancel={() => setModalOpen(false)} 
       />
       
-      {/* Mobile Footer */}
       <footer className="py-8 text-center text-xs text-gray-400 md:hidden">
         <p>原创微信号：yajie870423,谷歌账户：695274107@qq.com</p>
       </footer>

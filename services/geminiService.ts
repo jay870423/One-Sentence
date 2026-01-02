@@ -5,17 +5,20 @@ import { ParseResult, TransactionType, AIProvider } from "../types";
 // Note: If API_KEY is missing, this might not throw immediately until a call is made, or might throw depending on SDK version.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Gemini Schema
+// Gemini Schema - Now an Array of Objects
 const responseSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    amount: { type: Type.NUMBER, description: "The numeric amount of the transaction in CNY (¥)." },
-    category: { type: Type.STRING, description: "The category of the transaction (e.g., Food, Transport)." },
-    note: { type: Type.STRING, description: "A brief description of the item." },
-    date: { type: Type.STRING, description: "The date in YYYY-MM-DD format." },
-    type: { type: Type.STRING, enum: [TransactionType.EXPENSE, TransactionType.INCOME], description: "Whether it is an expense or income." },
-  },
-  required: ["amount", "category", "type", "date"],
+  type: Type.ARRAY,
+  items: {
+    type: Type.OBJECT,
+    properties: {
+      amount: { type: Type.NUMBER, description: "The numeric amount of the transaction in CNY (¥)." },
+      category: { type: Type.STRING, description: "The category of the transaction (e.g., Food, Transport)." },
+      note: { type: Type.STRING, description: "A brief description of the item." },
+      date: { type: Type.STRING, description: "The date in YYYY-MM-DD format." },
+      type: { type: Type.STRING, enum: [TransactionType.EXPENSE, TransactionType.INCOME], description: "Whether it is an expense or income." },
+    },
+    required: ["amount", "category", "type", "date"],
+  }
 };
 
 /**
@@ -29,30 +32,34 @@ const getPrompt = (input: string) => {
   return `
       Current Date: ${todayStr} (${weekday}).
       
-      Analyze the following user input for a personal bookkeeping entry: "${input}".
+      Analyze the following user input for personal bookkeeping. 
+      The input MAY contain multiple transactions happening on different dates.
+      Input: "${input}".
       
-      Your goal is to extract structured data for a Chinese-centric bookkeeping app (Currency: CNY/¥).
+      Your goal is to extract a list of structured data for a Chinese-centric bookkeeping app (Currency: CNY/¥).
 
       Rules:
-      1. **Amount & Currency**: 
-         - Extract the amount. 
-         - The base currency is CNY (¥). 
-         - Support Chinese slang units: "块" (kuai), "元" (yuan), "米" (mi), "w" (10,000), "k" (1,000).
-         - **Auto-Conversion**: If the user inputs a foreign currency (e.g., USD, EUR, JPY, HKD), convert it to CNY using an approximate current exchange rate. 
-         - If conversion occurs, append the original amount in the 'note' field (e.g., "Lunch ($10)").
-      2. **Category**: Infer a standard category (e.g., "餐饮", "交通", "购物", "娱乐", "居住", "医疗", "工资", "理财", "其他").
-      3. **Date**: Extract the date. Handle relative terms like "yesterday" (昨天), "last friday". Default to Current Date if not specified.
-      4. **Type**: Determine if it is EXPENSE (default) or INCOME (e.g., "salary", "red packet", "refund").
-      5. **Note**: Extract a short description. If the input is just numbers/category, generate a simple note.
+      1. **Split Multiple Items**: If the input describes multiple events (e.g. "Breakfast today 5, Lunch tomorrow 20"), split them into separate objects.
+      2. **Date Handling**: Strictly calculate dates based on the Current Date provided above. 
+         - "今天" = Current Date.
+         - "明天" = Current Date + 1 day.
+         - "后天" = Current Date + 2 days.
+         - "昨天" = Current Date - 1 day.
+      3. **Amount & Currency**: 
+         - Extract the amount. Base currency is CNY (¥). 
+         - Support units: "块", "元", "米", "w", "k".
+      4. **Category**: Infer a standard category (e.g., "餐饮", "交通", "购物", "娱乐", "居住", "医疗", "工资", "理财", "其他").
+      5. **Type**: Determine EXPENSE or INCOME.
+      6. **Note**: Extract a short description.
 
-      Return JSON only.
+      Return a JSON ARRAY.
     `;
 };
 
 /**
  * Gemini Handler
  */
-const parseWithGemini = async (input: string): Promise<ParseResult | null> => {
+const parseWithGemini = async (input: string): Promise<ParseResult[] | null> => {
   try {
     const prompt = getPrompt(input);
     const response = await ai.models.generateContent({
@@ -66,7 +73,7 @@ const parseWithGemini = async (input: string): Promise<ParseResult | null> => {
 
     const text = response.text;
     if (!text) return null;
-    return JSON.parse(text) as ParseResult;
+    return JSON.parse(text) as ParseResult[];
   } catch (error) {
     console.error("Gemini parsing error:", error);
     throw error;
@@ -76,7 +83,7 @@ const parseWithGemini = async (input: string): Promise<ParseResult | null> => {
 /**
  * DeepSeek Handler (OpenAI Compatible)
  */
-const parseWithDeepSeek = async (input: string): Promise<ParseResult | null> => {
+const parseWithDeepSeek = async (input: string): Promise<ParseResult[] | null> => {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   
   if (!apiKey || apiKey.trim() === '') {
@@ -85,12 +92,10 @@ const parseWithDeepSeek = async (input: string): Promise<ParseResult | null> => 
 
   const prompt = getPrompt(input);
   
-  // We need to append the schema explicitly for DeepSeek V3/Chat models as they don't support the strict 'responseSchema' object in the same way,
-  // but they are very good at following JSON instructions in the system prompt.
   const deepSeekSystemPrompt = `
     You are a helpful bookkeeping assistant. 
-    You MUST respond with valid JSON only. 
-    The JSON structure must be:
+    You MUST respond with a valid JSON ARRAY only. 
+    Each item in the array must follow this structure:
     {
       "amount": number,
       "category": string,
@@ -138,7 +143,14 @@ const parseWithDeepSeek = async (input: string): Promise<ParseResult | null> => 
     const content = data.choices?.[0]?.message?.content;
     
     if (!content) return null;
-    return JSON.parse(content) as ParseResult;
+    
+    // DeepSeek might wrap the array in an object key like { "transactions": [...] } or return raw array
+    // We try to parse flexibly
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) return parsed as ParseResult[];
+    if (parsed.transactions && Array.isArray(parsed.transactions)) return parsed.transactions as ParseResult[];
+    // Fallback if it returns a single object instead of array
+    return [parsed] as ParseResult[];
 
   } catch (error) {
     console.error("DeepSeek parsing error:", error);
@@ -149,10 +161,8 @@ const parseWithDeepSeek = async (input: string): Promise<ParseResult | null> => 
 /**
  * Main Exported Function
  */
-export const parseInput = async (input: string, provider: AIProvider = 'gemini'): Promise<ParseResult | null> => {
-  // We removed the try-catch wrapper here so that specific errors (like missing API key)
-  // bubble up to the UI component for better user feedback.
-  let data: ParseResult | null = null;
+export const parseInput = async (input: string, provider: AIProvider = 'gemini'): Promise<ParseResult[] | null> => {
+  let data: ParseResult[] | null = null;
   
   if (provider === 'deepseek') {
       data = await parseWithDeepSeek(input);
@@ -160,12 +170,14 @@ export const parseInput = async (input: string, provider: AIProvider = 'gemini')
       data = await parseWithGemini(input);
   }
 
-  if (!data) return null;
+  if (!data || data.length === 0) return null;
 
-  // Post-processing fallback defaults (shared)
+  // Post-processing
   const todayStr = new Date().toISOString().split('T')[0];
-  if (!data.date) data.date = todayStr;
-  if (!data.note) data.note = data.category;
   
-  return data;
+  return data.map(item => ({
+    ...item,
+    date: item.date || todayStr,
+    note: item.note || item.category
+  }));
 };
