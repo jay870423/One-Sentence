@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ParseResult, TransactionType, DEFAULT_CATEGORIES } from '../types';
-import { Check, X, Calendar, Tag, FileText, DollarSign } from 'lucide-react';
+import { Check, Calendar, Tag, FileText } from 'lucide-react';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
