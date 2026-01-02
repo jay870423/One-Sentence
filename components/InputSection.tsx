@@ -121,6 +121,24 @@ const InputSection: React.FC<InputSectionProps> = ({ onParse, isLoading, provide
       </div>
 
       <div className="relative group">
+        {/* Left Side: Voice Input Button */}
+        {isSupported && (
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10">
+             <button
+                onClick={toggleListening}
+                disabled={isLoading}
+                className={`p-2.5 rounded-xl transition-all duration-200 flex items-center justify-center ${
+                  isListening 
+                    ? 'text-red-500 bg-red-100 hover:bg-red-200 animate-pulse scale-110' 
+                    : 'text-gray-400 hover:text-black hover:bg-gray-100'
+                }`}
+                title="语音输入"
+              >
+                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+          </div>
+        )}
+
         <input
           type="text"
           value={text}
@@ -128,7 +146,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onParse, isLoading, provide
           onKeyDown={handleKeyDown}
           maxLength={MAX_LENGTH}
           placeholder={isListening ? "正在聆听..." : (provider === 'gemini' ? "Gemini: 早餐15..." : "DeepSeek: 早餐15...")}
-          className={`w-full text-lg pl-6 pr-32 py-4 border-2 outline-none transition-all duration-300 shadow-sm rounded-2xl
+          className={`w-full text-lg ${isSupported ? 'pl-14' : 'pl-6'} pr-20 py-4 border-2 outline-none transition-all duration-300 shadow-sm rounded-2xl
             ${isListening 
               ? 'bg-red-50 border-red-200 placeholder-red-400 focus:border-red-300' 
               : 'bg-gray-50 border-transparent focus:border-black focus:bg-white md:bg-white'
@@ -141,22 +159,6 @@ const InputSection: React.FC<InputSectionProps> = ({ onParse, isLoading, provide
         {/* Right side controls */}
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
             
-            {/* Voice Input Button */}
-            {isSupported && (
-              <button
-                onClick={toggleListening}
-                disabled={isLoading}
-                className={`p-2 rounded-xl transition-all ${
-                  isListening 
-                    ? 'text-red-500 bg-red-100 hover:bg-red-200 animate-pulse scale-110' 
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                }`}
-                title="语音输入"
-              >
-                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-              </button>
-            )}
-
             {/* Character Counter */}
             <span className={`text-[10px] font-medium transition-all duration-300 w-8 text-center hidden md:block ${
                 text.length > MAX_LENGTH * 0.9 ? 'text-red-500' : 'text-gray-300'
