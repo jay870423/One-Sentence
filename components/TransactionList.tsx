@@ -39,9 +39,17 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onDelet
   }, [transactions]);
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    // Manually parse YYYY-MM-DD to avoid timezone shifts (new Date("2023-01-01") creates UTC midnight,
+    // which might be prev day in local time).
+    const [year, month, day] = dateStr.split('-').map(Number);
+    // Create a date object at local midnight
+    const date = new Date(year, month - 1, day);
+    
     const today = new Date();
-    const isToday = date.toDateString() === today.toDateString();
+    const isToday = 
+        date.getDate() === today.getDate() && 
+        date.getMonth() === today.getMonth() && 
+        date.getFullYear() === today.getFullYear();
     
     if (isToday) return '今天'; // Localized "Today"
     
@@ -52,18 +60,22 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onDelet
     <div className="w-full px-4 md:px-0 pb-20 md:pb-8">
       
       {/* Monthly Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between">
+      {/* Mobile: Grid cols 2 (Income/Expense top, Balance bottom full width). Desktop: Grid cols 3. */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+        <div className="bg-gray-50 p-3 md:p-4 rounded-2xl border border-gray-100 flex flex-col justify-between overflow-hidden">
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">收入 (Income)</p>
-          <p className="text-lg font-bold text-green-600 truncate">+¥{stats.income.toFixed(2)}</p>
+          <p className="text-lg font-bold text-green-600 truncate" title={`+¥${stats.income.toFixed(2)}`}>+¥{stats.income.toFixed(2)}</p>
         </div>
-        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between">
+        <div className="bg-gray-50 p-3 md:p-4 rounded-2xl border border-gray-100 flex flex-col justify-between overflow-hidden">
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">支出 (Expense)</p>
-          <p className="text-lg font-bold text-gray-900 truncate">-¥{stats.expense.toFixed(2)}</p>
+          <p className="text-lg font-bold text-gray-900 truncate" title={`-¥${stats.expense.toFixed(2)}`}>-¥{stats.expense.toFixed(2)}</p>
         </div>
-        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between">
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">结余 (Balance)</p>
-          <p className={`text-lg font-bold truncate ${stats.balance >= 0 ? 'text-gray-900' : 'text-red-500'}`}>
+        <div className="col-span-2 md:col-span-1 bg-gray-50 p-3 md:p-4 rounded-2xl border border-gray-100 flex flex-col justify-between overflow-hidden">
+          <div className="flex flex-row md:flex-col justify-between items-center md:items-start">
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">结余 (Balance)</p>
+            {/* On mobile, we align balance right if using flex-row, or keep standard. Let's keep consistent text size but allow full width */}
+          </div>
+          <p className={`text-lg font-bold truncate ${stats.balance >= 0 ? 'text-gray-900' : 'text-red-500'}`} title={`¥${stats.balance.toFixed(2)}`}>
             {stats.balance >= 0 ? '' : ''}¥{stats.balance.toFixed(2)}
           </p>
         </div>

@@ -22,11 +22,23 @@ const responseSchema: Schema = {
 };
 
 /**
+ * Helper to get local date string YYYY-MM-DD
+ * This avoids timezone issues where toISOString() returns UTC (which might be yesterday/tomorrow)
+ */
+const getLocalTodayStr = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
  * Common Prompt Generator
  */
 const getPrompt = (input: string) => {
+  const todayStr = getLocalTodayStr();
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
   const weekday = today.toLocaleDateString('zh-CN', { weekday: 'long' });
 
   return `
@@ -173,10 +185,11 @@ export const parseInput = async (input: string, provider: AIProvider = 'gemini')
   if (!data || data.length === 0) return null;
 
   // Post-processing
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalTodayStr();
   
   return data.map(item => ({
     ...item,
+    // Ensure date defaults to local today if missing
     date: item.date || todayStr,
     note: item.note || item.category
   }));

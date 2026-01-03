@@ -32,12 +32,14 @@ const Calendar: React.FC<CalendarProps> = ({
   const dailyStats = useMemo(() => {
     const stats: { [key: number]: number } = {};
     transactions.forEach(t => {
-      const d = new Date(t.date);
+      // Manually parse date string to ensure it matches local calendar representation strictly
+      const [tYear, tMonth, tDay] = t.date.split('-').map(Number);
+      
       // Ensure we only process transactions for this month
-      if (d.getMonth() === month && d.getFullYear() === year) {
-        const day = d.getDate();
+      // Note: tMonth is 1-based from split, month is 0-based
+      if (tMonth === month + 1 && tYear === year) {
         const amount = t.type === TransactionType.EXPENSE ? -t.amount : t.amount;
-        stats[day] = (stats[day] || 0) + amount;
+        stats[tDay] = (stats[tDay] || 0) + amount;
       }
     });
     return stats;
